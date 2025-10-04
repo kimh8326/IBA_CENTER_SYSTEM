@@ -54,15 +54,21 @@ class User {
   factory User.fromJson(Map<String, dynamic> json) {
     // SQLite에서 boolean이 정수로 저장되므로 변환 필요
     final Map<String, dynamic> convertedJson = Map<String, dynamic>.from(json);
-    if (convertedJson['is_active'] is int) {
+
+    // is_active 처리: null, int, bool 모두 처리
+    if (convertedJson['is_active'] == null) {
+      convertedJson['is_active'] = true; // null이면 기본값 true
+    } else if (convertedJson['is_active'] is int) {
       convertedJson['is_active'] = convertedJson['is_active'] == 1;
+    } else if (convertedJson['is_active'] is! bool) {
+      convertedJson['is_active'] = true; // 예상치 못한 타입이면 기본값 true
     }
-    
+
     // null 값들을 적절한 기본값으로 처리
     convertedJson['name'] ??= '';
     convertedJson['phone'] ??= '';
     convertedJson['created_at'] ??= DateTime.now().toIso8601String();
-    
+
     return _$UserFromJson(convertedJson);
   }
   
