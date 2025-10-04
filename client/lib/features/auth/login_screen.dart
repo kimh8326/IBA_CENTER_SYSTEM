@@ -12,13 +12,34 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
+  final _serverUrlController = TextEditingController();
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isLoading = false;
   bool _obscurePassword = true;
+  bool _showServerUrl = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadServerUrl();
+  }
+
+  Future<void> _loadServerUrl() async {
+    final savedUrl = await ApiClient.getServerUrl();
+    if (savedUrl != null) {
+      _serverUrlController.text = savedUrl;
+    } else {
+      // 기본값 설정
+      _serverUrlController.text = 'http://192.168.0.20:3000';
+      _showServerUrl = true; // 저장된 URL이 없으면 필드 표시
+      setState(() {});
+    }
+  }
 
   @override
   void dispose() {
+    _serverUrlController.dispose();
     _phoneController.dispose();
     _passwordController.dispose();
     super.dispose();
@@ -32,6 +53,9 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
+      // 서버 URL 저장
+      await ApiClient.setServerUrl(_serverUrlController.text.trim());
+
       await context.read<AuthProvider>().login(
         _phoneController.text.trim(),
         _passwordController.text,
@@ -100,6 +124,52 @@ class _LoginScreenState extends State<LoginScreen> {
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 48),
+
+                  // 서버 URL 입력 (설정 아이콘 클릭 시 표시/숨김)
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          _showServerUrl ? '서버 설정' : '서버: ${_serverUrlController.text}',
+                          style: theme.textTheme.bodySmall,
+                        ),
+                      ),
+                      IconButton(
+                        icon: Icon(
+                          _showServerUrl ? Icons.expand_less : Icons.settings,
+                          size: 20,
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            _showServerUrl = !_showServerUrl;
+                          });
+                        },
+                      ),
+                    ],
+                  ),
+                  if (_showServerUrl) ...[
+                    TextFormField(
+                      controller: _serverUrlController,
+                      keyboardType: TextInputType.url,
+                      decoration: const InputDecoration(
+                        labelText: '서버 URL',
+                        hintText: 'http://192.168.0.20:3000',
+                        prefixIcon: Icon(Icons.dns),
+                        helperText: '예: http://192.168.0.20:3000',
+                      ),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return '서버 URL을 입력해주세요';
+                        }
+                        if (!value.startsWith('http://') && !value.startsWith('https://')) {
+                          return 'http:// 또는 https://로 시작해야 합니다';
+                        }
+                        return null;
+                      },
+                      textInputAction: TextInputAction.next,
+                    ),
+                    const SizedBox(height: 16),
+                  ],
 
                   // 전화번호 입력
                   TextFormField(

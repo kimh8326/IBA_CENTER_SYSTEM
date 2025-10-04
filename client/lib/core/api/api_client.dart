@@ -5,17 +5,37 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiClient {
   static const String _tokenKey = 'auth_token';
-  
-  // 개발 환경에서는 모든 플랫폼에서 localhost 사용
-  static String get _baseUrl {
-    // 개발 환경에서는 localhost, 프로덕션에서는 서버 IP 사용
-    final url = kDebugMode 
-        ? 'http://localhost:3000/api'  // 개발 중에는 모든 플랫폼에서 localhost
-        : 'http://172.30.1.18:3000/api'; // 프로덕션에서는 서버 IP
-    print('🌐 API_CLIENT: 현재 플랫폼=${kIsWeb ? "Web" : "Desktop"}, 디버그=${kDebugMode}, URL=$url');
-    return url;
+  static const String _serverUrlKey = 'server_url';
+
+  // 서버 URL을 SharedPreferences에서 읽어오기
+  static Future<String> get baseUrl async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedUrl = prefs.getString(_serverUrlKey);
+
+    // 저장된 URL이 있으면 사용, 없으면 기본값
+    final url = savedUrl ?? (kDebugMode
+        ? 'http://localhost:3000'  // 개발 중 기본값
+        : 'http://192.168.0.20:3000'); // 프로덕션 기본값
+
+    print('🌐 API_CLIENT: 현재 플랫폼=${kIsWeb ? "Web" : "Mobile"}, 디버그=${kDebugMode}, URL=$url/api');
+    return '$url/api';
   }
-  
+
+  // 서버 URL 저장
+  static Future<void> setServerUrl(String url) async {
+    final prefs = await SharedPreferences.getInstance();
+    // /api 제거하고 저장
+    final cleanUrl = url.replaceAll('/api', '').replaceAll(RegExp(r'/+$'), '');
+    await prefs.setString(_serverUrlKey, cleanUrl);
+    print('💾 API_CLIENT: 서버 URL 저장됨: $cleanUrl');
+  }
+
+  // 서버 URL 조회
+  static Future<String?> getServerUrl() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_serverUrlKey);
+  }
+
   final http.Client _client = http.Client();
   String? _authToken;
 
@@ -84,7 +104,8 @@ class ApiClient {
     await _loadToken();
 
     try {
-      var uri = Uri.parse('$_baseUrl$endpoint');
+      final base = await baseUrl;
+      var uri = Uri.parse('$base$endpoint');
       if (queryParams != null && queryParams.isNotEmpty) {
         uri = uri.replace(queryParameters: queryParams);
       }
@@ -111,10 +132,11 @@ class ApiClient {
     if (includeAuth) await _loadToken();
 
     try {
-      final url = Uri.parse('$_baseUrl$endpoint');
+      final base = await baseUrl;
+      final url = Uri.parse('$base$endpoint');
       final headers = _getHeaders(includeAuth: includeAuth);
       final body = json.encode(data);
-      
+
       // 디버그 정보 출력
       print('🌐 API POST Request:');
       print('   URL: $url');
@@ -150,8 +172,9 @@ class ApiClient {
     await _loadToken();
 
     try {
+      final base = await baseUrl;
       final response = await _client.put(
-        Uri.parse('$_baseUrl$endpoint'),
+        Uri.parse('$base$endpoint'),
         headers: _getHeaders(),
         body: json.encode(data),
       );
@@ -169,8 +192,9 @@ class ApiClient {
     await _loadToken();
 
     try {
+      final base = await baseUrl;
       final response = await _client.delete(
-        Uri.parse('$_baseUrl$endpoint'),
+        Uri.parse('$base$endpoint'),
         headers: _getHeaders(),
       );
 
