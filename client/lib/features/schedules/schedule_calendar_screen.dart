@@ -29,7 +29,7 @@ class ScheduleCalendarScreen extends StatefulWidget {
   State<ScheduleCalendarScreen> createState() => _ScheduleCalendarScreenState();
 }
 
-class _ScheduleCalendarScreenState extends State<ScheduleCalendarScreen> {
+class _ScheduleCalendarScreenState extends State<ScheduleCalendarScreen> with WidgetsBindingObserver {
   late final ValueNotifier<List<Schedule>> _selectedEvents;
   CalendarFormat _calendarFormat = CalendarFormat.month;
   DateTime _focusedDay = DateTime.now();
@@ -38,6 +38,7 @@ class _ScheduleCalendarScreenState extends State<ScheduleCalendarScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
 
     _selectedDay = DateTime.now();
     _selectedEvents = ValueNotifier(_getEventsForDay(_selectedDay!));
@@ -49,8 +50,20 @@ class _ScheduleCalendarScreenState extends State<ScheduleCalendarScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _selectedEvents.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // 앱이 다시 활성화되면 스케줄 새로고침
+      _loadMonthSchedules();
+      if (_selectedDay != null) {
+        _selectedEvents.value = _getEventsForDay(_selectedDay!);
+      }
+    }
   }
 
   void _loadMonthSchedules() {

@@ -15,7 +15,7 @@ class BookingListScreen extends StatefulWidget {
 }
 
 class _BookingListScreenState extends State<BookingListScreen> {
-  String _selectedFilter = 'all';
+  String _selectedFilter = 'confirmed';
 
   @override
   void initState() {
@@ -178,16 +178,16 @@ class _BookingListScreenState extends State<BookingListScreen> {
                   child: SegmentedButton<String>(
                     segments: const [
                       ButtonSegment<String>(
-                        value: 'all',
-                        label: Text('전체'),
-                      ),
-                      ButtonSegment<String>(
                         value: 'confirmed',
                         label: Text('확정'),
                       ),
                       ButtonSegment<String>(
                         value: 'cancelled',
                         label: Text('취소'),
+                      ),
+                      ButtonSegment<String>(
+                        value: 'all',
+                        label: Text('전체'),
                       ),
                     ],
                     selected: {_selectedFilter},

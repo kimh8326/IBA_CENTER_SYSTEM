@@ -115,13 +115,13 @@ router.post('/', async (req, res) => {
             });
         }
 
-        // 중복 예약 확인
+        // 중복 예약 확인 (confirmed 상태만)
         const existingBooking = await req.db.getQuery(
-            'SELECT id FROM bookings WHERE schedule_id = ? AND user_id = ? AND booking_status != "cancelled"',
+            'SELECT id, booking_status FROM bookings WHERE schedule_id = ? AND user_id = ?',
             [schedule_id, user_id]
         );
 
-        if (existingBooking) {
+        if (existingBooking && existingBooking.booking_status !== 'cancelled') {
             return res.status(409).json({
                 error: 'Conflict',
                 message: '이미 예약된 스케줄입니다.'
@@ -136,9 +136,17 @@ router.post('/', async (req, res) => {
             });
         }
 
+        // 취소된 예약이 있으면 삭제
+        if (existingBooking && existingBooking.booking_status === 'cancelled') {
+            await req.db.runQuery(
+                'DELETE FROM bookings WHERE id = ?',
+                [existingBooking.id]
+            );
+        }
+
         // 예약 생성
         const result = await req.db.runQuery(`
-            INSERT INTO bookings (schedule_id, user_id, membership_id, booking_type) 
+            INSERT INTO bookings (schedule_id, user_id, membership_id, booking_type)
             VALUES (?, ?, ?, ?)
         `, [schedule_id, user_id, membership_id, booking_type]);
 
