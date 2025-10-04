@@ -118,6 +118,8 @@ CREATE TABLE IF NOT EXISTS schedules (
     current_capacity INTEGER DEFAULT 0,
     status TEXT DEFAULT 'scheduled' CHECK (status IN ('scheduled', 'in_progress', 'completed', 'cancelled')),
     notes TEXT,
+    cancelled_at DATETIME,
+    cancel_reason TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (class_type_id) REFERENCES class_types(id),

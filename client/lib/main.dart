@@ -5,6 +5,7 @@ import 'core/providers/auth_provider.dart';
 import 'core/providers/schedule_provider.dart';
 import 'core/providers/booking_provider.dart';
 import 'core/providers/instructor_provider.dart';
+import 'core/providers/notification_provider.dart';
 import 'features/auth/login_screen.dart';
 import 'features/dashboard/dashboard_screen.dart';
 
@@ -25,6 +26,7 @@ class PilatesCenterApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => ScheduleProvider()),
         ChangeNotifierProvider(create: (_) => BookingProvider()),
         ChangeNotifierProvider(create: (_) => InstructorProvider()),
+        ChangeNotifierProvider(create: (_) => NotificationProvider()),
       ],
       child: MaterialApp(
         title: '필라테스 센터 관리',

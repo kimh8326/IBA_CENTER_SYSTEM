@@ -77,10 +77,10 @@ router.get('/', async (req, res) => {
                 (SELECT COUNT(*) FROM bookings WHERE schedule_id = s.id AND booking_status = 'confirmed') as booked_count,
                 (SELECT COUNT(*) FROM waiting_list WHERE schedule_id = s.id) as waiting_count,
                 -- 내 예약 여부 (회원인 경우)
-                CASE 
-                    WHEN ? = 'member' THEN 
-                        (SELECT COUNT(*) FROM bookings WHERE schedule_id = s.id AND user_id = ? AND booking_status IN ('confirmed', 'cancelled'))
-                    ELSE 0 
+                CASE
+                    WHEN ? = 'member' THEN
+                        (SELECT COUNT(*) FROM bookings WHERE schedule_id = s.id AND user_id = ? AND booking_status = 'confirmed')
+                    ELSE 0
                 END as my_booking_status
             FROM schedules s
             LEFT JOIN users u ON s.instructor_id = u.id
@@ -643,6 +643,128 @@ router.get('/stats/overview', requireStaff, async (req, res) => {
         res.status(500).json({
             error: 'Internal Server Error',
             message: '스케줄 통계를 가져오는 중 오류가 발생했습니다.'
+        });
+    }
+});
+
+// 스케줄 취소 (관리자 전용)
+router.put('/:id/cancel', requireMaster, async (req, res) => {
+    const scheduleId = parseInt(req.params.id);
+    const { cancel_reason } = req.body;
+
+    try {
+        // 트랜잭션 시작
+        await req.db.runQuery('BEGIN TRANSACTION');
+
+        // 1. 스케줄 정보 조회
+        const schedule = await req.db.getQuery(`
+            SELECT s.*,
+                   u.name as instructor_name,
+                   ct.name as class_type_name
+            FROM schedules s
+            LEFT JOIN users u ON s.instructor_id = u.id
+            LEFT JOIN class_types ct ON s.class_type_id = ct.id
+            WHERE s.id = ?
+        `, [scheduleId]);
+
+        if (!schedule) {
+            await req.db.runQuery('ROLLBACK');
+            return res.status(404).json({
+                error: 'Not Found',
+                message: '스케줄을 찾을 수 없습니다.'
+            });
+        }
+
+        // 2. 이미 취소된 스케줄인지 확인
+        if (schedule.status === 'cancelled') {
+            await req.db.runQuery('ROLLBACK');
+            return res.status(409).json({
+                error: 'Conflict',
+                message: '이미 취소된 스케줄입니다.'
+            });
+        }
+
+        // 3. 완료된 스케줄인지 확인
+        if (schedule.status === 'completed') {
+            await req.db.runQuery('ROLLBACK');
+            return res.status(400).json({
+                error: 'Bad Request',
+                message: '완료된 스케줄은 취소할 수 없습니다.'
+            });
+        }
+
+        // 4. 스케줄 상태를 취소로 변경
+        await req.db.runQuery(`
+            UPDATE schedules
+            SET status = 'cancelled', cancelled_at = CURRENT_TIMESTAMP, cancel_reason = ?
+            WHERE id = ?
+        `, [cancel_reason, scheduleId]);
+
+        // 5. 해당 스케줄의 모든 confirmed 예약을 cancelled로 변경
+        await req.db.runQuery(`
+            UPDATE bookings
+            SET booking_status = 'cancelled', cancelled_at = CURRENT_TIMESTAMP, cancel_reason = ?
+            WHERE schedule_id = ? AND booking_status = 'confirmed'
+        `, ['수업이 취소되었습니다', scheduleId]);
+
+        // 6. 예약한 회원 목록 조회
+        const bookedMembers = await req.db.getAllQuery(`
+            SELECT DISTINCT b.user_id, u.name as user_name
+            FROM bookings b
+            LEFT JOIN users u ON b.user_id = u.id
+            WHERE b.schedule_id = ? AND b.booking_status = 'cancelled'
+        `, [scheduleId]);
+
+        // 7. 강사에게 알림 발송
+        const scheduledDate = new Date(schedule.scheduled_at).toLocaleString('ko-KR');
+        await req.db.runQuery(`
+            INSERT INTO notifications (user_id, type, title, message, related_entity_type, related_entity_id)
+            VALUES (?, 'CLASS_CANCELLATION', '담당 수업이 취소되었습니다', ?, 'schedule', ?)
+        `, [
+            schedule.instructor_id,
+            `${scheduledDate} ${schedule.class_type_name} 수업이 취소되었습니다.${cancel_reason ? '\n사유: ' + cancel_reason : ''}`,
+            scheduleId
+        ]);
+
+        // 8. 예약한 모든 회원에게 알림 발송
+        for (const member of bookedMembers) {
+            await req.db.runQuery(`
+                INSERT INTO notifications (user_id, type, title, message, related_entity_type, related_entity_id)
+                VALUES (?, 'CLASS_CANCELLATION', '예약한 수업이 취소되었습니다', ?, 'schedule', ?)
+            `, [
+                member.user_id,
+                `${scheduledDate} ${schedule.class_type_name} 수업이 취소되었습니다.${cancel_reason ? '\n사유: ' + cancel_reason : ''}`,
+                scheduleId
+            ]);
+        }
+
+        // 9. 활동 로그 기록
+        await req.db.runQuery(`
+            INSERT INTO activity_logs (user_id, action, target_type, target_id, details)
+            VALUES (?, 'cancel', 'schedule', ?, ?)
+        `, [req.user.userId, scheduleId, JSON.stringify({
+            cancel_reason,
+            instructor_name: schedule.instructor_name,
+            class_type_name: schedule.class_type_name,
+            scheduled_at: schedule.scheduled_at,
+            affected_members: bookedMembers.length
+        })]);
+
+        // 트랜잭션 커밋
+        await req.db.runQuery('COMMIT');
+
+        res.json({
+            message: '수업이 취소되었습니다.',
+            affectedBookings: bookedMembers.length
+        });
+
+    } catch (error) {
+        // 트랜잭션 롤백
+        await req.db.runQuery('ROLLBACK');
+        console.error('Cancel schedule error:', error);
+        res.status(500).json({
+            error: 'Internal Server Error',
+            message: '수업 취소 중 오류가 발생했습니다.'
         });
     }
 });

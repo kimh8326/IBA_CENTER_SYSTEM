@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../core/providers/schedule_provider.dart';
 import '../../core/providers/auth_provider.dart';
 import '../../core/providers/booking_provider.dart';
+import '../../core/providers/notification_provider.dart';
 import '../../core/models/schedule.dart';
 import '../../core/models/booking.dart';
 import 'schedule_create_screen.dart';
@@ -193,6 +194,80 @@ class _ScheduleCalendarScreenState extends State<ScheduleCalendarScreen> {
           ),
         );
       }
+    }
+  }
+
+  Future<void> _cancelSchedule(Schedule schedule) async {
+    // 취소 사유 입력 다이얼로그
+    String? reason;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('수업 취소'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('이 수업을 취소하시겠습니까?\n\n해당 수업을 예약한 모든 회원과 담당 강사에게 알림이 발송됩니다.'),
+            const SizedBox(height: 16),
+            TextField(
+              decoration: const InputDecoration(
+                labelText: '취소 사유',
+                hintText: '취소 사유를 입력해주세요',
+              ),
+              onChanged: (value) => reason = value,
+              maxLines: 2,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('취소'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.red,
+            ),
+            child: const Text('수업 취소'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    final success = await context.read<ScheduleProvider>().cancelSchedule(
+      schedule.id,
+      reason: reason,
+    );
+
+    if (success && mounted) {
+      // 성공 시 관련 데이터 새로고침
+      await Future.wait([
+        context.read<BookingProvider>().loadBookings(),
+        context.read<NotificationProvider>().loadUnreadCount(),
+      ]);
+
+      _loadMonthSchedules();
+      _selectedEvents.value = _getEventsForDay(_selectedDay!);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('수업이 취소되었습니다'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(context.read<ScheduleProvider>().error ?? '수업 취소에 실패했습니다'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
@@ -442,9 +517,13 @@ class _ScheduleCalendarScreenState extends State<ScheduleCalendarScreen> {
             itemCount: schedules.length,
             itemBuilder: (context, index) {
               final schedule = schedules[index];
+              final authProvider = context.read<AuthProvider>();
               return _ScheduleCard(
                 schedule: schedule,
                 onBook: _bookSchedule,
+                onCancel: authProvider.user?.isMaster == true
+                    ? _cancelSchedule
+                    : null,
               );
             },
           ),
@@ -457,10 +536,12 @@ class _ScheduleCalendarScreenState extends State<ScheduleCalendarScreen> {
 class _ScheduleCard extends StatelessWidget {
   final Schedule schedule;
   final Function(Schedule)? onBook;
+  final Function(Schedule)? onCancel;
 
   const _ScheduleCard({
     required this.schedule,
     this.onBook,
+    this.onCancel,
   });
 
   @override
@@ -609,18 +690,36 @@ class _ScheduleCard extends StatelessWidget {
                     }
                     
                     if (authProvider.hasPermission('manage_schedules')) {
-                      return TextButton(
-                        onPressed: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('예약 현황 보기 기능 준비 중입니다'),
+                      return Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          TextButton(
+                            onPressed: () {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('예약 현황 보기 기능 준비 중입니다'),
+                                ),
+                              );
+                            },
+                            child: const Text('예약 현황'),
+                          ),
+                          if (onCancel != null && schedule.status != 'cancelled')
+                            TextButton.icon(
+                              onPressed: () {
+                                if (onCancel != null) {
+                                  onCancel!(schedule);
+                                }
+                              },
+                              icon: const Icon(Icons.cancel, size: 18),
+                              label: const Text('수업 취소'),
+                              style: TextButton.styleFrom(
+                                foregroundColor: Colors.red,
+                              ),
                             ),
-                          );
-                        },
-                        child: const Text('예약 현황'),
+                        ],
                       );
                     }
-                    
+
                     return const SizedBox.shrink();
                   },
                 ),

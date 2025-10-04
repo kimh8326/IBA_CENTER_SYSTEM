@@ -14,6 +14,7 @@ const bookingRoutes = require('./routes/bookings');
 const classTypeRoutes = require('./routes/class-types');
 const membershipTemplateRoutes = require('./routes/membership-templates');
 const adminRoutes = require('./routes/admin');
+const notificationRoutes = require('./routes/notifications');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -76,6 +77,7 @@ app.use('/api/bookings', bookingRoutes);
 app.use('/api/class-types', classTypeRoutes);
 app.use('/api/membership-templates', membershipTemplateRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // 헬스체크 엔드포인트
 app.get('/api/health', (req, res) => {

@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../../core/providers/auth_provider.dart';
 import '../../core/providers/schedule_provider.dart';
 import '../../core/providers/booking_provider.dart';
+import '../../core/providers/notification_provider.dart';
 import '../../core/models/user.dart';
 import '../schedules/schedule_calendar_screen.dart';
 import '../bookings/booking_list_screen.dart';
@@ -11,6 +12,8 @@ import '../users/user_list_screen.dart';
 import '../instructors/instructor_list_screen.dart';
 import '../admin/class_type_management_screen.dart';
 import '../admin/membership_template_management_screen.dart';
+import '../admin/admin_message_screen.dart';
+import '../notifications/notification_list_screen.dart';
 import '../../core/api/api_client.dart';
 
 Color _parseColorString(String colorString, Color defaultColor) {
@@ -49,6 +52,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       context.read<ScheduleProvider>().loadSchedules(),
       context.read<ScheduleProvider>().loadClassTypes(),
       context.read<BookingProvider>().loadBookings(),
+      context.read<NotificationProvider>().loadUnreadCount(),
     ]);
   }
 
@@ -95,6 +99,57 @@ class _DashboardScreenState extends State<DashboardScreen> {
           appBar: AppBar(
             title: Text(_getPageTitle(_selectedIndex)),
             actions: [
+              // 알림 아이콘
+              Consumer<NotificationProvider>(
+                builder: (context, notificationProvider, _) {
+                  return Stack(
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.notifications_outlined),
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const NotificationListScreen(),
+                            ),
+                          ).then((_) {
+                            // 알림 화면에서 돌아올 때 안 읽은 알림 개수 새로고침
+                            context.read<NotificationProvider>().loadUnreadCount();
+                          });
+                        },
+                        tooltip: '알림',
+                      ),
+                      if (notificationProvider.unreadCount > 0)
+                        Positioned(
+                          right: 8,
+                          top: 8,
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: Colors.red,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            constraints: const BoxConstraints(
+                              minWidth: 18,
+                              minHeight: 18,
+                            ),
+                            child: Text(
+                              notificationProvider.unreadCount > 99
+                                  ? '99+'
+                                  : notificationProvider.unreadCount.toString(),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        ),
+                    ],
+                  );
+                },
+              ),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Row(
@@ -476,19 +531,24 @@ class _DashboardHomeState extends State<_DashboardHome> {
                   ),
                 if (widget.user.isMaster)
                   _QuickActionCard(
+                    icon: Icons.campaign,
+                    title: '알림 발송',
+                    subtitle: '관리자 메시지 전송',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const AdminMessageScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                if (widget.user.isMaster)
+                  _QuickActionCard(
                     icon: _isResetting ? Icons.hourglass_empty : Icons.refresh,
                     title: _isResetting ? 'DB 초기화 중...' : 'DB 초기화',
                     subtitle: _isResetting ? '진행 중' : '데이터베이스 재설정',
                     onTap: () => _resetDatabase(),
-                  ),
-                if (widget.user.isMaster)
-                  _QuickActionCard(
-                    icon: Icons.settings,
-                    title: '설정',
-                    subtitle: '시스템 설정',
-                    onTap: () {
-                      // 설정 화면으로 이동
-                    },
                   ),
               ],
             ),

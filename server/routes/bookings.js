@@ -1,8 +1,9 @@
 const express = require('express');
-const { 
-    authenticateToken, 
+const {
+    authenticateToken,
+    requireMaster,
     requireBookingOwnership,
-    dataFilters 
+    dataFilters
 } = require('../middleware/auth');
 const router = express.Router();
 
@@ -169,69 +170,156 @@ router.post('/', async (req, res) => {
 
 // 예약 취소
 router.put('/:id/cancel', async (req, res) => {
-    try {
-        const bookingId = parseInt(req.params.id);
-        const { cancel_reason } = req.body;
+    const bookingId = parseInt(req.params.id);
+    const { cancel_reason } = req.body;
 
-        // 예약 정보 조회
+    try {
+        // 트랜잭션 시작
+        await req.db.runQuery('BEGIN TRANSACTION');
+
+        // 1. 예약 정보 조회
         const booking = await req.db.getQuery(`
-            SELECT b.*, s.scheduled_at 
-            FROM bookings b 
-            LEFT JOIN schedules s ON b.schedule_id = s.id 
+            SELECT b.*, s.scheduled_at, u.name as user_name
+            FROM bookings b
+            LEFT JOIN schedules s ON b.schedule_id = s.id
+            LEFT JOIN users u ON b.user_id = u.id
             WHERE b.id = ?
         `, [bookingId]);
 
         if (!booking) {
+            await req.db.runQuery('ROLLBACK');
             return res.status(404).json({
                 error: 'Not Found',
                 message: '예약을 찾을 수 없습니다.'
             });
         }
 
-        // 권한 확인 (본인 예약이거나 관리자/강사)
+        // 2. 권한 확인 (본인 예약이거나 관리자/강사)
         if (req.user.userType === 'member' && booking.user_id !== req.user.userId) {
+            await req.db.runQuery('ROLLBACK');
             return res.status(403).json({
                 error: 'Forbidden',
                 message: '권한이 없습니다.'
             });
         }
 
-        // 이미 취소된 예약 확인
+        // 3. 이미 취소된 예약 확인
         if (booking.booking_status === 'cancelled') {
+            await req.db.runQuery('ROLLBACK');
             return res.status(409).json({
                 error: 'Conflict',
                 message: '이미 취소된 예약입니다.'
             });
         }
 
-        // 예약 취소
+        // 4. 예약 상태를 취소로 변경
         await req.db.runQuery(`
-            UPDATE bookings 
+            UPDATE bookings
             SET booking_status = 'cancelled', cancelled_at = CURRENT_TIMESTAMP, cancel_reason = ?
             WHERE id = ?
         `, [cancel_reason, bookingId]);
 
-        // 스케줄의 현재 인원 수 업데이트
-        await req.db.runQuery(
-            'UPDATE schedules SET current_capacity = current_capacity - 1 WHERE id = ?',
-            [booking.schedule_id]
-        );
+        // 5. 스케줄의 현재 인원 수 감소 (confirmed 상태였던 경우만)
+        if (booking.booking_status === 'confirmed') {
+            await req.db.runQuery(
+                'UPDATE schedules SET current_capacity = current_capacity - 1 WHERE id = ? AND current_capacity > 0',
+                [booking.schedule_id]
+            );
+        }
 
-        // 활동 로그 기록
+        // 6. 회원에게 예약 취소 알림 발송
+        const scheduledDate = new Date(booking.scheduled_at).toLocaleString('ko-KR');
         await req.db.runQuery(`
-            INSERT INTO activity_logs (user_id, action, target_type, target_id, details) 
+            INSERT INTO notifications (user_id, type, title, message, related_entity_type, related_entity_id)
+            VALUES (?, 'CLASS_CANCELLATION', '예약이 취소되었습니다', ?, 'booking', ?)
+        `, [
+            booking.user_id,
+            `${scheduledDate} 수업 예약이 취소되었습니다.${cancel_reason ? '\n사유: ' + cancel_reason : ''}`,
+            bookingId
+        ]);
+
+        // 7. 활동 로그 기록
+        await req.db.runQuery(`
+            INSERT INTO activity_logs (user_id, action, target_type, target_id, details)
             VALUES (?, 'cancel', 'booking', ?, ?)
-        `, [req.user.userId, bookingId, JSON.stringify({ cancel_reason })]);
+        `, [req.user.userId, bookingId, JSON.stringify({ cancel_reason, cancelled_user: booking.user_name })]);
+
+        // 트랜잭션 커밋
+        await req.db.runQuery('COMMIT');
 
         res.json({
             message: '예약이 취소되었습니다.'
         });
 
     } catch (error) {
+        // 트랜잭션 롤백
+        await req.db.runQuery('ROLLBACK');
         console.error('Cancel booking error:', error);
         res.status(500).json({
             error: 'Internal Server Error',
             message: '예약 취소 중 오류가 발생했습니다.'
+        });
+    }
+});
+
+// 예약 삭제 (관리자 전용)
+router.delete('/:id', requireMaster, async (req, res) => {
+    const bookingId = parseInt(req.params.id);
+
+    try {
+        // 트랜잭션 시작
+        await req.db.runQuery('BEGIN TRANSACTION');
+
+        // 1. 예약 정보 조회
+        const booking = await req.db.getQuery(`
+            SELECT b.*, u.name as user_name
+            FROM bookings b
+            LEFT JOIN users u ON b.user_id = u.id
+            WHERE b.id = ?
+        `, [bookingId]);
+
+        if (!booking) {
+            await req.db.runQuery('ROLLBACK');
+            return res.status(404).json({
+                error: 'Not Found',
+                message: '예약을 찾을 수 없습니다.'
+            });
+        }
+
+        // 2. 예약이 취소되지 않은 상태라면 스케줄 인원 수 조정
+        if (booking.booking_status === 'confirmed') {
+            await req.db.runQuery(
+                'UPDATE schedules SET current_capacity = current_capacity - 1 WHERE id = ? AND current_capacity > 0',
+                [booking.schedule_id]
+            );
+        }
+
+        // 3. 예약 삭제
+        await req.db.runQuery('DELETE FROM bookings WHERE id = ?', [bookingId]);
+
+        // 4. 활동 로그 기록
+        await req.db.runQuery(`
+            INSERT INTO activity_logs (user_id, action, target_type, target_id, details)
+            VALUES (?, 'delete', 'booking', ?, ?)
+        `, [req.user.userId, bookingId, JSON.stringify({
+            deleted_user: booking.user_name,
+            schedule_id: booking.schedule_id
+        })]);
+
+        // 트랜잭션 커밋
+        await req.db.runQuery('COMMIT');
+
+        res.json({
+            message: '예약이 삭제되었습니다.'
+        });
+
+    } catch (error) {
+        // 트랜잭션 롤백
+        await req.db.runQuery('ROLLBACK');
+        console.error('Delete booking error:', error);
+        res.status(500).json({
+            error: 'Internal Server Error',
+            message: '예약 삭제 중 오류가 발생했습니다.'
         });
     }
 });

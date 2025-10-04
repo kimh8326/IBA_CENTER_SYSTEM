@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../core/providers/booking_provider.dart';
+import '../../core/providers/schedule_provider.dart';
+import '../../core/providers/notification_provider.dart';
 import '../../core/providers/auth_provider.dart';
 import '../../core/models/booking.dart';
 
@@ -46,16 +48,72 @@ class _BookingListScreenState extends State<BookingListScreen> {
     );
 
     if (success && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('예약이 취소되었습니다'),
-          backgroundColor: Colors.green,
-        ),
-      );
+      // 예약 취소 성공 시 스케줄과 알림도 새로고침
+      await Future.wait([
+        context.read<ScheduleProvider>().loadSchedules(),
+        context.read<NotificationProvider>().loadUnreadCount(),
+      ]);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('예약이 취소되었습니다'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
     } else if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(context.read<BookingProvider>().error ?? '취소에 실패했습니다'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  void _deleteBooking(Booking booking) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('예약 삭제'),
+        content: const Text('예약을 완전히 삭제하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('취소'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.red,
+            ),
+            child: const Text('삭제'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    final success = await context.read<BookingProvider>().deleteBooking(booking.id);
+
+    if (success && mounted) {
+      // 예약 삭제 성공 시 스케줄도 새로고침
+      await context.read<ScheduleProvider>().loadSchedules();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('예약이 삭제되었습니다'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(context.read<BookingProvider>().error ?? '삭제에 실패했습니다'),
           backgroundColor: Colors.red,
         ),
       );
@@ -224,9 +282,13 @@ class _BookingListScreenState extends State<BookingListScreen> {
                     itemCount: filteredBookings.length,
                     itemBuilder: (context, index) {
                       final booking = filteredBookings[index];
+                      final authProvider = context.read<AuthProvider>();
                       return _BookingCard(
                         booking: booking,
                         onCancel: () => _cancelBooking(booking),
+                        onDelete: authProvider.user?.isMaster == true
+                            ? () => _deleteBooking(booking)
+                            : null,
                       );
                     },
                   ),
@@ -243,10 +305,12 @@ class _BookingListScreenState extends State<BookingListScreen> {
 class _BookingCard extends StatelessWidget {
   final Booking booking;
   final VoidCallback? onCancel;
+  final VoidCallback? onDelete;
 
   const _BookingCard({
     required this.booking,
     this.onCancel,
+    this.onDelete,
   });
 
   @override
@@ -440,6 +504,24 @@ class _BookingCard extends StatelessWidget {
                     label: const Text('취소'),
                     style: TextButton.styleFrom(
                       foregroundColor: theme.colorScheme.error,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+
+            // 삭제 버튼 (관리자 전용, 취소된 예약)
+            if (booking.isCancelled && onDelete != null) ...[
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton.icon(
+                    onPressed: onDelete,
+                    icon: const Icon(Icons.delete_forever, size: 18),
+                    label: const Text('삭제'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: Colors.red.shade700,
                     ),
                   ),
                 ],

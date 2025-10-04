@@ -120,6 +120,24 @@ class ScheduleProvider with ChangeNotifier {
     }
   }
 
+  Future<bool> cancelSchedule(int scheduleId, {String? reason}) async {
+    _setLoading(true);
+    _setError(null);
+
+    try {
+      await _apiClient.put('/schedules/$scheduleId/cancel', {
+        'cancel_reason': reason ?? '관리자에 의해 취소됨',
+      });
+
+      await loadSchedules();
+      return true;
+    } catch (e) {
+      _setError(e.toString());
+      _setLoading(false);
+      return false;
+    }
+  }
+
   void clearError() {
     _setError(null);
   }

@@ -83,7 +83,23 @@ class BookingProvider with ChangeNotifier {
     try {
       final request = CancelBookingRequest(cancelReason: reason);
       await _apiClient.put('/bookings/$bookingId/cancel', request.toJson());
-      
+
+      await loadBookings();
+      return true;
+    } catch (e) {
+      _setError(e.toString());
+      _setLoading(false);
+      return false;
+    }
+  }
+
+  Future<bool> deleteBooking(int bookingId) async {
+    _setLoading(true);
+    _setError(null);
+
+    try {
+      await _apiClient.delete('/bookings/$bookingId');
+
       await loadBookings();
       return true;
     } catch (e) {
