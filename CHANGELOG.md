@@ -7,6 +7,43 @@
 
 ## [Unreleased]
 
+## [1.0.3] - 2025-10-04
+
+### Added
+- ✨ **회원 예약 취소 시 강사 알림 기능**
+  - 회원이 수업 예약을 취소하면 해당 수업의 강사에게 자동으로 알림 발송
+  - 알림 메시지에 회원명, 수업 일시, 수업 타입, 취소 사유 포함
+  - 강사가 회원의 예약 취소를 즉시 확인 가능
+
+### Fixed
+- 🐛 **예약 재예약 오류 수정**
+  - 취소된 예약을 다시 예약할 때 UNIQUE 제약 조건 오류 발생 문제 해결
+  - 취소된 예약이 존재하는 경우 자동으로 삭제 후 새 예약 생성
+  - `server/routes/bookings.js`: 예약 생성 로직 개선
+
+- 🐛 **예약 생성 후 화면 업데이트 문제 해결**
+  - 예약 생성 후 스케줄 탭에서 예약 정보가 즉시 반영되지 않던 문제 수정
+  - 예약 탭 진입 시 "이미 예약된 스케쥴입니다" 오류 메시지 표시 문제 해결
+  - `ScheduleProvider.loadSchedules()` 호출로 스케줄 데이터 자동 새로고침
+  - `BookingProvider` 오류 상태 관리 개선
+
+### Changed
+- 🔧 **예약 관리 UI/UX 개선**
+  - 예약 필터 버튼 순서 변경: 전체 → 확정 → 취소 에서 **확정 → 취소 → 전체** 로 변경
+  - 기본 필터를 '전체'에서 '확정'으로 변경하여 사용자 편의성 향상
+  - `client/lib/features/bookings/booking_list_screen.dart`
+
+- 🔄 **스케줄 화면 자동 새로고침**
+  - `WidgetsBindingObserver` 추가로 앱이 재활성화될 때 자동 새로고침
+  - 다른 앱에서 돌아왔을 때 스케줄 데이터가 자동으로 업데이트
+  - `client/lib/features/schedules/schedule_calendar_screen.dart`
+
+### Technical Details
+- **API Optimization**: 예약 취소 API 쿼리에 강사 ID 및 수업 타입 정보 포함
+- **Database**: UNIQUE 제약 조건 충돌 처리 로직 개선
+- **State Management**: Provider 패턴 오류 처리 및 상태 관리 최적화
+- **Lifecycle Management**: Flutter 앱 라이프사이클 이벤트 활용한 자동 새로고침 구현
+
 ## [1.0.2] - 2025-09-30
 
 ### Fixed
