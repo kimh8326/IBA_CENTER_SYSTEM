@@ -66,8 +66,11 @@ class BookingProvider with ChangeNotifier {
 
     try {
       await _apiClient.post('/bookings', request.toJson());
-      
+
+      // 예약 생성 성공 후 목록 새로고침
       await loadBookings();
+      // loadBookings에서 오류가 발생해도 예약 생성 자체는 성공했으므로 true 반환
+      _setError(null);  // 오류 클리어
       return true;
     } catch (e) {
       _setError(e.toString());

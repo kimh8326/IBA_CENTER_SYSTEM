@@ -195,8 +195,9 @@ class _ScheduleCalendarScreenState extends State<ScheduleCalendarScreen> with Wi
             backgroundColor: theme.colorScheme.primary,
           ),
         );
-        
-        // 스케줄 목록 새로고침
+
+        // 스케줄 및 예약 데이터 새로고침
+        await context.read<ScheduleProvider>().loadSchedules();
         _loadMonthSchedules();
         _selectedEvents.value = _getEventsForDay(_selectedDay!);
       } else {
