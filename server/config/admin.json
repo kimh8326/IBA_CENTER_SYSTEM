@@ -4,7 +4,7 @@
   "name": "센터 관리자",
   "email": "admin@center.com",
   "created_at": "2025-09-10T13:45:00.000Z",
-  "last_updated": "2025-09-30T12:55:31.478Z",
+  "last_updated": "2025-10-04T03:44:18.168Z",
   "note": "관리자 계정은 DB 초기화와 무관하게 별도 관리됩니다",
-  "last_login_at": "2025-09-30T12:55:31.478Z"
+  "last_login_at": "2025-10-04T03:44:18.168Z"
 }

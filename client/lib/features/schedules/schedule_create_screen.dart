@@ -31,8 +31,9 @@ class _ScheduleCreateScreenState extends State<ScheduleCreateScreen> {
   
   // Data
   List<ClassType> _classTypes = [];
+  List<ClassType> _filteredClassTypes = [];
   List<User> _instructors = [];
-  
+
   bool _isLoading = false;
   bool _isSubmitting = false;
 
@@ -55,6 +56,10 @@ class _ScheduleCreateScreenState extends State<ScheduleCreateScreen> {
         _loadClassTypes(),
         _loadInstructors(),
       ]);
+      // 초기에는 모든 수업 타입을 보여줌
+      setState(() {
+        _filteredClassTypes = _classTypes;
+      });
     } finally {
       setState(() {
         _isLoading = false;
@@ -139,6 +144,26 @@ class _ScheduleCreateScreenState extends State<ScheduleCreateScreen> {
       if (classType != null) {
         _duration = classType.durationMinutes;
         _maxCapacity = classType.maxCapacity;
+      }
+    });
+  }
+
+  void _onInstructorChanged(User? instructor) {
+    setState(() {
+      _selectedInstructor = instructor;
+
+      if (instructor == null || instructor.teachableClassTypeIds == null || instructor.teachableClassTypeIds!.isEmpty) {
+        // 강사가 선택되지 않았거나, 가르칠 수 있는 수업이 없으면 모든 수업 타입을 보여줌
+        _filteredClassTypes = _classTypes;
+      } else {
+        // 강사가 가르칠 수 있는 수업만 필터링
+        final teachableIds = instructor.teachableClassTypeIds!.toSet();
+        _filteredClassTypes = _classTypes.where((ct) => teachableIds.contains(ct.id)).toList();
+      }
+
+      // 만약 이전에 선택된 수업 타입이 필터링된 목록에 없다면 선택 해제
+      if (_selectedClassType != null && !_filteredClassTypes.contains(_selectedClassType)) {
+        _selectedClassType = null;
       }
     });
   }
@@ -316,7 +341,7 @@ class _ScheduleCreateScreenState extends State<ScheduleCreateScreen> {
                         border: OutlineInputBorder(),
                         prefixIcon: Icon(Icons.class_),
                       ),
-                      items: _classTypes.map((classType) {
+                      items: _filteredClassTypes.map((classType) {
                         return DropdownMenuItem<ClassType>(
                           value: classType,
                           child: Text(classType.name),
@@ -338,11 +363,7 @@ class _ScheduleCreateScreenState extends State<ScheduleCreateScreen> {
                           child: Text(instructor.name),
                         );
                       }).toList(),
-                      onChanged: (instructor) {
-                        setState(() {
-                          _selectedInstructor = instructor;
-                        });
-                      },
+                      onChanged: _onInstructorChanged,
                     ),
                     const SizedBox(height: 16),
                     Row(

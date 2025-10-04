@@ -66,6 +66,7 @@ class InstructorProvider with ChangeNotifier {
     String? certifications,
     double? hourlyRate,
     String? bio,
+    List<int>? classTypeIds,
   }) async {
     try {
       final data = {
@@ -78,6 +79,7 @@ class InstructorProvider with ChangeNotifier {
         if (certifications != null) 'certifications': certifications,
         if (hourlyRate != null) 'hourly_rate': hourlyRate,
         if (bio != null) 'bio': bio,
+        if (classTypeIds != null && classTypeIds.isNotEmpty) 'class_type_ids': classTypeIds,
       };
 
       await _apiClient.post('/instructors', data);

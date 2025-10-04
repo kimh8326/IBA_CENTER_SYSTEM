@@ -56,6 +56,15 @@ CREATE TABLE IF NOT EXISTS instructor_profiles (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
+-- 4.1. 강사-수업타입 연결 테이블
+CREATE TABLE IF NOT EXISTS instructor_class_types (
+    instructor_id INTEGER NOT NULL,
+    class_type_id INTEGER NOT NULL,
+    PRIMARY KEY (instructor_id, class_type_id),
+    FOREIGN KEY (instructor_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (class_type_id) REFERENCES class_types(id) ON DELETE CASCADE
+);
+
 -- 5. 수업 타입 (필라테스, 요가 등)
 CREATE TABLE IF NOT EXISTS class_types (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -169,8 +178,8 @@ CREATE TABLE IF NOT EXISTS activity_logs (
     details TEXT, -- JSON 형태로 상세 정보
     ip_address TEXT,
     user_agent TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id)
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    -- FOREIGN KEY 제거: 관리자 계정은 파일로 관리되어 DB에 없음
 );
 
 -- 13. 센터 설정
@@ -182,6 +191,20 @@ CREATE TABLE IF NOT EXISTS settings (
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 14. 알림
+CREATE TABLE IF NOT EXISTS notifications (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    type TEXT NOT NULL CHECK (type IN ('CLASS_REMINDER', 'CLASS_CANCELLATION', 'MEMBERSHIP_EXPIRING', 'ADMIN_MESSAGE', 'SYSTEM')),
+    title TEXT NOT NULL,
+    message TEXT NOT NULL,
+    is_read BOOLEAN DEFAULT 0,
+    related_entity_type TEXT,
+    related_entity_id INTEGER,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
 -- 인덱스 생성 (성능 최적화)
 CREATE INDEX IF NOT EXISTS idx_users_phone ON users(phone);
 CREATE INDEX IF NOT EXISTS idx_users_type ON users(user_type);
@@ -190,3 +213,5 @@ CREATE INDEX IF NOT EXISTS idx_schedules_instructor ON schedules(instructor_id);
 CREATE INDEX IF NOT EXISTS idx_bookings_schedule ON bookings(schedule_id);
 CREATE INDEX IF NOT EXISTS idx_bookings_user ON bookings(user_id);
 CREATE INDEX IF NOT EXISTS idx_activity_logs_date ON activity_logs(created_at);
+CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_user_read_status ON notifications(user_id, is_read);

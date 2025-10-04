@@ -29,6 +29,8 @@ class User {
   @JsonKey(name: 'hourly_rate')
   final double? hourlyRate;
   final String? bio;
+  @JsonKey(name: 'teachable_class_type_ids')
+  final List<int>? teachableClassTypeIds;
 
   User({
     required this.id,
@@ -46,6 +48,7 @@ class User {
     this.certifications,
     this.hourlyRate,
     this.bio,
+    this.teachableClassTypeIds,
   });
 
   factory User.fromJson(Map<String, dynamic> json) {

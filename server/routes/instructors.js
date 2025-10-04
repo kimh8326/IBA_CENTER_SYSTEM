@@ -10,8 +10,8 @@ const router = express.Router();
 
 router.use(authenticateToken);
 
-// 강사 목록 조회 (마스터 전용)
-router.get('/', requireMaster, async (req, res) => {
+// 강사 목록 조회 (스태프 이상 - 스케줄 생성용)
+router.get('/', requireStaff, async (req, res) => {
     try {
         const { status = 'active', search } = req.query;
         
@@ -31,27 +31,37 @@ router.get('/', requireMaster, async (req, res) => {
         }
 
         const instructors = await req.db.getAllQuery(`
-            SELECT 
+            SELECT
                 u.id as id, u.user_type, u.name, u.phone, u.email, u.profile_image,
                 u.is_active, u.last_login_at, u.created_at, u.updated_at,
                 ip.specialization as specializations,
                 ip.hourly_rate,
                 ip.bio,
                 ip.certifications,
-                ip.experience_years
+                ip.experience_years,
+                GROUP_CONCAT(ict.class_type_id) as teachable_class_type_ids
             FROM users u
             LEFT JOIN instructor_profiles ip ON u.id = ip.user_id
+            LEFT JOIN instructor_class_types ict ON u.id = ict.instructor_id
             ${whereClause}
+            GROUP BY u.id
             ORDER BY u.created_at DESC
         `, params);
 
         // 각 강사별 통계 정보 추가
         for (let instructor of instructors) {
+            // teachable_class_type_ids를 숫자 배열로 변환
+            if (instructor.teachable_class_type_ids) {
+                instructor.teachable_class_type_ids = instructor.teachable_class_type_ids.split(',').map(Number);
+            } else {
+                instructor.teachable_class_type_ids = [];
+            }
+
             // 이번 달 수업 수
             const thisMonthClasses = await req.db.getQuery(`
-                SELECT COUNT(*) as count 
-                FROM schedules 
-                WHERE instructor_id = ? 
+                SELECT COUNT(*) as count
+                FROM schedules
+                WHERE instructor_id = ?
                 AND DATE(scheduled_at) >= DATE('now', 'start of month')
                 AND DATE(scheduled_at) < DATE('now', 'start of month', '+1 month')
                 AND status != 'cancelled'
@@ -95,17 +105,20 @@ router.get('/:id', requireStaff, async (req, res) => {
         }
 
         const instructor = await req.db.getQuery(`
-            SELECT 
+            SELECT
                 u.id as id, u.user_type, u.name, u.phone, u.email, u.profile_image,
                 u.is_active, u.last_login_at, u.created_at, u.updated_at,
                 ip.specialization as specializations,
                 ip.experience_years,
                 ip.certifications,
                 ip.hourly_rate,
-                ip.bio
+                ip.bio,
+                GROUP_CONCAT(ict.class_type_id) as teachable_class_type_ids
             FROM users u
             LEFT JOIN instructor_profiles ip ON u.id = ip.user_id
+            LEFT JOIN instructor_class_types ict ON u.id = ict.instructor_id
             WHERE u.id = ? AND u.user_type = 'instructor'
+            GROUP BY u.id
         `, [instructorId]);
 
         if (!instructor) {
@@ -113,6 +126,13 @@ router.get('/:id', requireStaff, async (req, res) => {
                 error: 'Not Found',
                 message: '강사를 찾을 수 없습니다.'
             });
+        }
+
+        // teachable_class_type_ids를 숫자 배열로 변환
+        if (instructor.teachable_class_type_ids) {
+            instructor.teachable_class_type_ids = instructor.teachable_class_type_ids.split(',').map(Number);
+        } else {
+            instructor.teachable_class_type_ids = [];
         }
 
         // 강사 통계 정보 추가
@@ -148,16 +168,23 @@ router.get('/:id', requireStaff, async (req, res) => {
 // 새 강사 생성 (마스터 전용)
 router.post('/', requireMaster, async (req, res) => {
     try {
-        const { 
+        const {
             name, phone, email, password,
             specializations, experience_years, certifications,
-            hourly_rate, bio 
+            hourly_rate, bio, class_type_ids
         } = req.body;
 
         if (!name || !phone || !password) {
             return res.status(400).json({
                 error: 'Bad Request',
                 message: '이름, 전화번호, 비밀번호는 필수입니다.'
+            });
+        }
+
+        if (!class_type_ids || !Array.isArray(class_type_ids) || class_type_ids.length === 0) {
+            return res.status(400).json({
+                error: 'Bad Request',
+                message: '최소 하나 이상의 수업 타입을 선택해야 합니다.'
             });
         }
 
@@ -212,14 +239,22 @@ router.post('/', requireMaster, async (req, res) => {
             ]);
         }
 
+        // 강사-수업타입 연결
+        for (const classTypeId of class_type_ids) {
+            await req.db.runQuery(`
+                INSERT INTO instructor_class_types (instructor_id, class_type_id)
+                VALUES (?, ?)
+            `, [result.id, classTypeId]);
+        }
+
         // 활동 로그 기록
         await req.db.runQuery(`
-            INSERT INTO activity_logs (user_id, action, target_type, target_id, details) 
+            INSERT INTO activity_logs (user_id, action, target_type, target_id, details)
             VALUES (?, 'create', 'instructor', ?, ?)
         `, [
-            req.user.userId, 
-            result.id, 
-            JSON.stringify({ name, phone, email })
+            req.user.userId,
+            result.id,
+            JSON.stringify({ name, phone, email, class_type_ids })
         ]);
 
         res.status(201).json({

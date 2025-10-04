@@ -16,13 +16,13 @@ class Booking {
   @JsonKey(name: 'booking_status')
   final String bookingStatus;
   @JsonKey(name: 'booked_at')
-  final String bookedAt;
+  final String? bookedAt;
   @JsonKey(name: 'cancelled_at')
   final String? cancelledAt;
   @JsonKey(name: 'cancel_reason')
   final String? cancelReason;
   @JsonKey(name: 'created_at')
-  final String createdAt;
+  final String? createdAt;
   @JsonKey(name: 'updated_at')
   final String? updatedAt;
 
@@ -47,10 +47,10 @@ class Booking {
     this.membershipId,
     required this.bookingType,
     required this.bookingStatus,
-    required this.bookedAt,
+    this.bookedAt,
     this.cancelledAt,
     this.cancelReason,
-    required this.createdAt,
+    this.createdAt,
     this.updatedAt,
     this.userName,
     this.userPhone,

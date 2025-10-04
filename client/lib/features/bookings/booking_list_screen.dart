@@ -387,7 +387,9 @@ class _BookingCard extends StatelessWidget {
                 ),
                 const SizedBox(width: 4),
                 Text(
-                  '예약일: ${DateFormat('yyyy-MM-dd HH:mm').format(DateTime.parse(booking.bookedAt))}',
+                  booking.bookedAt != null
+                      ? '예약일: ${DateFormat('yyyy-MM-dd HH:mm').format(DateTime.parse(booking.bookedAt!))}'
+                      : '예약일: -',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),

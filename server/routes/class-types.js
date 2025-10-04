@@ -1,11 +1,11 @@
 const express = require('express');
-const { authenticateToken, requireMaster } = require('../middleware/auth');
+const { authenticateToken, requireMaster, requireStaff } = require('../middleware/auth');
 const router = express.Router();
 
 router.use(authenticateToken);
 
-// 모든 수업 타입 조회 (관리자 전용)
-router.get('/', requireMaster, async (req, res) => {
+// 모든 수업 타입 조회 (스태프 이상)
+router.get('/', requireStaff, async (req, res) => {
     try {
         const { include_inactive = 'false' } = req.query;
         

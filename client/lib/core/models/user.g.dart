@@ -22,6 +22,9 @@ User _$UserFromJson(Map<String, dynamic> json) => User(
   certifications: json['certifications'] as String?,
   hourlyRate: (json['hourly_rate'] as num?)?.toDouble(),
   bio: json['bio'] as String?,
+  teachableClassTypeIds: (json['teachable_class_type_ids'] as List<dynamic>?)
+      ?.map((e) => (e as num).toInt())
+      .toList(),
 );
 
 Map<String, dynamic> _$UserToJson(User instance) => <String, dynamic>{
@@ -40,6 +43,7 @@ Map<String, dynamic> _$UserToJson(User instance) => <String, dynamic>{
   'certifications': instance.certifications,
   'hourly_rate': instance.hourlyRate,
   'bio': instance.bio,
+  'teachable_class_type_ids': instance.teachableClassTypeIds,
 };
 
 MemberProfile _$MemberProfileFromJson(Map<String, dynamic> json) =>

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/providers/instructor_provider.dart';
+import '../../core/api/api_client.dart';
+import '../../core/models/class_type.dart';
 
 class InstructorCreateScreen extends StatefulWidget {
   const InstructorCreateScreen({super.key});
@@ -22,7 +24,17 @@ class _InstructorCreateScreenState extends State<InstructorCreateScreen> {
   final _hourlyRateController = TextEditingController();
   final _bioController = TextEditingController();
 
+  final ApiClient _apiClient = ApiClient();
+  List<ClassType> _classTypes = [];
+  Set<int> _selectedClassTypeIds = {};
   bool _isLoading = false;
+  bool _isLoadingClassTypes = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadClassTypes();
+  }
 
   @override
   void dispose() {
@@ -39,6 +51,30 @@ class _InstructorCreateScreenState extends State<InstructorCreateScreen> {
     super.dispose();
   }
 
+  Future<void> _loadClassTypes() async {
+    try {
+      final response = await _apiClient.get('/class-types');
+      final List<dynamic> data = response['classTypes'];
+
+      setState(() {
+        _classTypes = data
+            .map((json) => ClassType.fromJson(json as Map<String, dynamic>))
+            .where((classType) => classType.isActive)
+            .toList();
+        _isLoadingClassTypes = false;
+      });
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoadingClassTypes = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('수업 타입 로드 실패: $e')),
+        );
+      }
+    }
+  }
+
   Future<void> _createInstructor() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -53,6 +89,13 @@ class _InstructorCreateScreenState extends State<InstructorCreateScreen> {
       _isLoading = true;
     });
 
+    if (_selectedClassTypeIds.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('최소 하나 이상의 수업 타입을 선택해주세요')),
+      );
+      return;
+    }
+
     try {
       final success = await context.read<InstructorProvider>().createInstructor(
         name: _nameController.text.trim(),
@@ -64,6 +107,7 @@ class _InstructorCreateScreenState extends State<InstructorCreateScreen> {
         certifications: _certificationsController.text.trim().isEmpty ? null : _certificationsController.text.trim(),
         hourlyRate: _hourlyRateController.text.trim().isEmpty ? null : double.tryParse(_hourlyRateController.text.trim()),
         bio: _bioController.text.trim().isEmpty ? null : _bioController.text.trim(),
+        classTypeIds: _selectedClassTypeIds.toList(),
       );
 
       if (success) {
@@ -221,6 +265,80 @@ class _InstructorCreateScreenState extends State<InstructorCreateScreen> {
                           return null;
                         },
                       ),
+                    ],
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 16),
+
+              // 수업 타입 선택
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '담당 수업 타입 *',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '이 강사가 담당할 수 있는 수업 타입을 선택하세요',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      if (_isLoadingClassTypes)
+                        const Center(child: CircularProgressIndicator())
+                      else if (_classTypes.isEmpty)
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.orange[50],
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.orange[200]!),
+                          ),
+                          child: const Row(
+                            children: [
+                              Icon(Icons.warning_amber, color: Colors.orange),
+                              SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  '등록된 수업 타입이 없습니다. 먼저 수업 타입을 생성해주세요.',
+                                  style: TextStyle(color: Colors.orange),
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      else
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: _classTypes.map((classType) {
+                            final isSelected = _selectedClassTypeIds.contains(classType.id);
+                            return FilterChip(
+                              label: Text(classType.name),
+                              selected: isSelected,
+                              onSelected: (selected) {
+                                setState(() {
+                                  if (selected) {
+                                    _selectedClassTypeIds.add(classType.id);
+                                  } else {
+                                    _selectedClassTypeIds.remove(classType.id);
+                                  }
+                                });
+                              },
+                              selectedColor: Theme.of(context).colorScheme.primaryContainer,
+                              checkmarkColor: Theme.of(context).colorScheme.primary,
+                            );
+                          }).toList(),
+                        ),
                     ],
                   ),
                 ),
