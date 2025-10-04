@@ -185,12 +185,14 @@ router.put('/:id/cancel', async (req, res) => {
         // 트랜잭션 시작
         await req.db.runQuery('BEGIN TRANSACTION');
 
-        // 1. 예약 정보 조회
+        // 1. 예약 정보 조회 (강사 정보 포함)
         const booking = await req.db.getQuery(`
-            SELECT b.*, s.scheduled_at, u.name as user_name
+            SELECT b.*, s.scheduled_at, s.instructor_id, u.name as user_name,
+                   ct.name as class_type_name
             FROM bookings b
             LEFT JOIN schedules s ON b.schedule_id = s.id
             LEFT JOIN users u ON b.user_id = u.id
+            LEFT JOIN class_types ct ON s.class_type_id = ct.id
             WHERE b.id = ?
         `, [bookingId]);
 
@@ -235,8 +237,10 @@ router.put('/:id/cancel', async (req, res) => {
             );
         }
 
-        // 6. 회원에게 예약 취소 알림 발송
+        // 6. 회원 및 강사에게 예약 취소 알림 발송
         const scheduledDate = new Date(booking.scheduled_at).toLocaleString('ko-KR');
+
+        // 6-1. 회원에게 알림
         await req.db.runQuery(`
             INSERT INTO notifications (user_id, type, title, message, related_entity_type, related_entity_id)
             VALUES (?, 'CLASS_CANCELLATION', '예약이 취소되었습니다', ?, 'booking', ?)
@@ -245,6 +249,18 @@ router.put('/:id/cancel', async (req, res) => {
             `${scheduledDate} 수업 예약이 취소되었습니다.${cancel_reason ? '\n사유: ' + cancel_reason : ''}`,
             bookingId
         ]);
+
+        // 6-2. 강사에게 알림
+        if (booking.instructor_id) {
+            await req.db.runQuery(`
+                INSERT INTO notifications (user_id, type, title, message, related_entity_type, related_entity_id)
+                VALUES (?, 'CLASS_CANCELLATION', '회원이 수업 예약을 취소했습니다', ?, 'booking', ?)
+            `, [
+                booking.instructor_id,
+                `${booking.user_name} 회원이 ${scheduledDate} ${booking.class_type_name || '수업'} 예약을 취소했습니다.${cancel_reason ? '\n사유: ' + cancel_reason : ''}`,
+                bookingId
+            ]);
+        }
 
         // 7. 활동 로그 기록
         await req.db.runQuery(`
