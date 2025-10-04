@@ -1,6 +1,6 @@
 {
   "name": "pilates-center-server",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Local server for Pilates Center Management System",
   "main": "index.js",
   "scripts": {

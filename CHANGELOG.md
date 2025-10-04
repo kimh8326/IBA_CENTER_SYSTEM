@@ -7,6 +7,20 @@
 
 ## [Unreleased]
 
+## [1.0.2] - 2025-09-30
+
+### Fixed
+- 🐛 **회원 상세 화면 회원권 정보 표시 문제 해결**
+  - Membership 모델의 JSON 파싱 오류 수정
+  - `user_id` 필드 null safety 처리 추가 (`json['user_id'] as int? ?? 0`)
+  - 회원 등록 시 선택한 회원권 정보가 상세 화면에서 정상 표시되도록 개선
+
+### Technical Details
+- **Model Improvement**: Membership.fromJson() 메서드 null 처리 강화
+- **API Compatibility**: API 응답 구조와 클라이언트 모델 간 호환성 개선
+- **Data Parsing**: 회원권 데이터 파싱 안정성 향상
+- **Error Handling**: null 값 처리로 앱 크래시 방지
+
 ## [1.0.1] - 2025-09-30
 
 ### Added

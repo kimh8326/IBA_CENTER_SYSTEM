@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import '../../core/api/api_client.dart';
 import '../../core/models/user.dart';
 import '../members/member_registration_screen.dart';
+import 'user_detail_screen.dart';
 
 class UserListScreen extends StatefulWidget {
   const UserListScreen({super.key});
@@ -27,6 +28,20 @@ class UserListScreenState extends State<UserListScreen> {
     );
 
     // 회원 등록이 성공한 경우 목록 새로고침
+    if (result == true) {
+      loadUsers();
+    }
+  }
+
+  Future<void> _navigateToUserDetail(int userId) async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => UserDetailScreen(userId: userId),
+      ),
+    );
+    
+    // 회원 정보가 변경된 경우 목록 새로고침
     if (result == true) {
       loadUsers();
     }
@@ -198,7 +213,10 @@ class UserListScreenState extends State<UserListScreen> {
         itemCount: _users.length,
         itemBuilder: (context, index) {
           final user = _users[index];
-          return _UserCard(user: user);
+          return _UserCard(
+            user: user,
+            onTap: () => _navigateToUserDetail(user.id),
+          );
         },
       ),
     );
@@ -207,8 +225,9 @@ class UserListScreenState extends State<UserListScreen> {
 
 class _UserCard extends StatelessWidget {
   final User user;
+  final VoidCallback? onTap;
 
-  const _UserCard({required this.user});
+  const _UserCard({required this.user, this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -220,7 +239,10 @@ class _UserCard extends StatelessWidget {
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
-      child: Padding(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -352,6 +374,7 @@ class _UserCard extends StatelessWidget {
               ],
             ),
           ],
+        ),
         ),
       ),
     );

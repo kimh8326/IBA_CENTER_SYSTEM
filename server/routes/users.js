@@ -185,9 +185,38 @@ router.get('/:id', async (req, res) => {
             `, [req.user.userId, userId]);
         }
 
+        // 회원권 정보 조회 (사용자가 회원인 경우)
+        let memberships = null;
+        if (user.user_type === 'member') {
+            memberships = await req.db.getAllQuery(`
+                SELECT 
+                    m.id,
+                    m.template_id,
+                    m.remaining_sessions,
+                    m.start_date,
+                    m.end_date,
+                    m.purchase_price,
+                    m.status,
+                    m.purchased_at,
+                    mt.name as template_name,
+                    mt.description as template_description,
+                    mt.total_sessions,
+                    mt.validity_days,
+                    mt.price as template_price,
+                    ct.name as class_type_name,
+                    ct.color as class_type_color
+                FROM memberships m
+                JOIN membership_templates mt ON m.template_id = mt.id
+                LEFT JOIN class_types ct ON mt.class_type_id = ct.id
+                WHERE m.user_id = ?
+                ORDER BY m.purchased_at DESC
+            `, [userId]);
+        }
+
         res.json({
             user,
             profile,
+            ...(memberships && { memberships }),
             ...(classHistory && { classHistory })
         });
 

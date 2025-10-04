@@ -117,7 +117,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           body: IndexedStack(
             index: _selectedIndex,
             children: [
-              _DashboardHome(user: user),
+              _DashboardHome(user: user, onNavigate: _onItemTapped),
               const ScheduleCalendarScreen(),
               const BookingListScreen(),
               if (user.isMaster || user.isInstructor) UserListScreen(key: _userListKey),
@@ -201,8 +201,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
 class _DashboardHome extends StatefulWidget {
   final User user;
+  final void Function(int) onNavigate;
 
-  const _DashboardHome({required this.user});
+  const _DashboardHome({required this.user, required this.onNavigate});
 
   @override
   State<_DashboardHome> createState() => _DashboardHomeState();
@@ -451,35 +452,27 @@ class _DashboardHomeState extends State<_DashboardHome> {
                   icon: Icons.schedule,
                   title: '스케줄 보기',
                   subtitle: '수업 일정 확인',
-                  onTap: () {
-                    // 스케줄 탭으로 이동
-                  },
+                  onTap: () => widget.onNavigate(1),
                 ),
                 _QuickActionCard(
                   icon: Icons.book,
                   title: '예약 현황',
                   subtitle: '예약 상태 확인',
-                  onTap: () {
-                    // 예약 탭으로 이동
-                  },
+                  onTap: () => widget.onNavigate(2),
                 ),
                 if (widget.user.isMaster || widget.user.isInstructor)
                   _QuickActionCard(
                     icon: Icons.people,
                     title: '회원 관리',
                     subtitle: '회원 정보 관리',
-                    onTap: () {
-                      // 회원 탭으로 이동
-                    },
+                    onTap: () => widget.onNavigate(3),
                   ),
                 if (widget.user.isMaster)
                   _QuickActionCard(
                     icon: Icons.class_,
                     title: '수업 타입 관리',
                     subtitle: '수업 종류 설정',
-                    onTap: () {
-                      // 수업 타입 관리 탭으로 이동
-                    },
+                    onTap: () => widget.onNavigate(5),
                   ),
                 if (widget.user.isMaster)
                   _QuickActionCard(
