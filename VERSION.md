@@ -1,6 +1,6 @@
 # 버전 관리 시스템
 
-## 현재 버전: v1.0.3
+## 현재 버전: v1.0.4
 
 ## 버전 관리 정책
 
@@ -20,6 +20,31 @@ MAJOR.MINOR.PATCH
 - **Alpha**: v1.1.0-alpha.1, v1.1.0-alpha.2
 
 ## 버전 히스토리
+
+### v1.0.4 (2025-10-04)
+**Android 앱 안정화 및 버그 수정**
+
+#### 버그 수정
+- 🐛 **Android 서버 연결 문제 해결**
+  - 하드코딩된 서버 URL 제거
+  - 사용자가 로그인 화면에서 서버 URL 설정 가능
+  - Release 빌드에서 localhost 사용 문제 해결
+
+- 🐛 **회원 상세 화면 오류 수정**
+  - User 모델의 is_active 필드 null 처리 개선
+  - "type 'Null' is not a subtype of type 'bool'" 오류 해결
+  - 회원 관리 탭에서 회원 클릭 시 크래시 방지
+
+#### 새로운 기능
+- ✨ **로그인 화면 서버 URL 설정**
+  - 설정 아이콘 클릭으로 서버 URL 입력 필드 표시/숨김
+  - SharedPreferences를 통한 서버 URL 저장
+  - URL 유효성 검증 (http:// 또는 https:// 필수)
+
+#### 기술적 개선사항
+- ✅ API 클라이언트 동적 서버 URL 지원
+- ✅ User 모델 null safety 강화
+- ✅ Android APK 설치 가이드 문서 추가
 
 ### v1.0.3 (2025-10-04)
 **예약 시스템 안정화 및 알림 기능 강화**

@@ -7,6 +7,39 @@
 
 ## [Unreleased]
 
+## [1.0.4] - 2025-10-04
+
+### Fixed
+- 🐛 **Android 서버 연결 문제 해결**
+  - 하드코딩된 서버 URL 제거 (기존: localhost 또는 고정 IP)
+  - Release 빌드에서 localhost 사용으로 인한 연결 실패 해결
+  - `client/lib/core/api/api_client.dart`: 동적 서버 URL 지원
+
+- 🐛 **회원 상세 화면 크래시 수정**
+  - User 모델의 `is_active` 필드 null 처리 개선
+  - "type 'Null' is not a subtype of type 'bool' in type cast" 오류 해결
+  - 회원 관리 탭에서 회원 클릭 시 앱 크래시 방지
+  - `client/lib/core/models/user.dart`: null safety 강화
+
+### Added
+- ✨ **로그인 화면 서버 URL 설정 기능**
+  - 설정 아이콘 클릭으로 서버 URL 입력 필드 표시/숨김
+  - SharedPreferences를 통한 서버 URL 영구 저장
+  - URL 유효성 검증 (http:// 또는 https:// 필수)
+  - 기본값: `http://192.168.0.20:3000`
+  - `client/lib/features/auth/login_screen.dart`
+
+- 📄 **Android APK 설치 가이드 문서**
+  - 상세한 설치 방법 (USB, 이메일, 클라우드)
+  - 서버 설정 및 문제 해결 가이드
+  - `ANDROID_INSTALLATION.md`
+
+### Technical Details
+- **API Client**: SharedPreferences 기반 서버 URL 동적 관리
+- **User Model**: null 값에 대한 안전한 기본값 처리
+- **Login Screen**: 서버 URL 설정 UI/UX 추가
+- **APK Build**: v1.0.4 (Build 5) - 51MB
+
 ## [1.0.3] - 2025-10-04
 
 ### Added
